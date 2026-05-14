@@ -50,9 +50,9 @@ services:
     environment:
       - AZURE_AI_PROJECT_ENDPOINT=${AZURE_AI_PROJECT_ENDPOINT}
       - AZURE_OPENAI_DEPLOYMENT_NAME=${AZURE_OPENAI_DEPLOYMENT_NAME:-gpt-4o}
-      - MCP_ICD10_CODES=${MCP_ICD10_CODES:-https://mcp.deepsense.ai/icd10_codes/mcp}
+      - MCP_ICD10_CODES=${MCP_ICD10_CODES:-https://hcls.mcp.claude.com/icd10_codes/mcp}
       - MCP_PUBMED=${MCP_PUBMED:-https://pubmed.mcp.claude.com/mcp}
-      - MCP_CLINICAL_TRIALS=${MCP_CLINICAL_TRIALS:-https://mcp.deepsense.ai/clinical_trials/mcp}
+      - MCP_CLINICAL_TRIALS=${MCP_CLINICAL_TRIALS:-https://hcls.mcp.claude.com/clinical_trials/mcp}
       - APPLICATION_INSIGHTS_CONNECTION_STRING=${APPLICATION_INSIGHTS_CONNECTION_STRING:-}
       # OTel sensitive-data capture (PHI risk — local dev only). Default: false.
       - ENABLE_OTEL_SENSITIVE_DATA=${ENABLE_OTEL_SENSITIVE_DATA:-false}
@@ -75,8 +75,8 @@ services:
     environment:
       - AZURE_AI_PROJECT_ENDPOINT=${AZURE_AI_PROJECT_ENDPOINT}
       - AZURE_OPENAI_DEPLOYMENT_NAME=${AZURE_OPENAI_DEPLOYMENT_NAME:-gpt-4o}
-      - MCP_NPI_REGISTRY=${MCP_NPI_REGISTRY:-https://mcp.deepsense.ai/npi_registry/mcp}
-      - MCP_CMS_COVERAGE=${MCP_CMS_COVERAGE:-https://mcp.deepsense.ai/cms_coverage/mcp}
+      - MCP_NPI_REGISTRY=${MCP_NPI_REGISTRY:-https://hcls.mcp.claude.com/npi_registry/mcp}
+      - MCP_CMS_COVERAGE=${MCP_CMS_COVERAGE:-https://hcls.mcp.claude.com/cms_coverage/mcp}
       - APPLICATION_INSIGHTS_CONNECTION_STRING=${APPLICATION_INSIGHTS_CONNECTION_STRING:-}
       # OTel sensitive-data capture (PHI risk — local dev only). Default: false.
       - ENABLE_OTEL_SENSITIVE_DATA=${ENABLE_OTEL_SENSITIVE_DATA:-false}

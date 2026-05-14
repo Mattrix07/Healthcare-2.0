@@ -151,11 +151,11 @@ seen with platform-managed MCPs.
 
 | MCP Server | Used by | Wiring | Notes |
 |---|---|---|---|
-| ICD-10 codes | Clinical | In-container `MCPStreamableHTTPTool` | DeepSense; `User-Agent: claude-code/1.0` header required |
-| Clinical Trials | Clinical | In-container `MCPStreamableHTTPTool` | DeepSense |
-| NPI Registry | Coverage | In-container `MCPStreamableHTTPTool` | DeepSense |
-| CMS Coverage | Coverage | In-container `MCPStreamableHTTPTool` | DeepSense |
-| PubMed | Clinical | In-container `_ReconnectingMCPTool` | Subclass that catches `McpError('Session terminated')` and reconnects (~10 min idle expiry) |
+| ICD-10 codes | Clinical | In-container `MCPStreamableHTTPTool` | Anthropic healthcare gateway (`hcls.mcp.claude.com`); UA header injected defensively |
+| Clinical Trials | Clinical | In-container `MCPStreamableHTTPTool` | Anthropic healthcare gateway (`hcls.mcp.claude.com`) |
+| NPI Registry | Coverage | In-container `MCPStreamableHTTPTool` | Anthropic healthcare gateway (`hcls.mcp.claude.com`) |
+| CMS Coverage | Coverage | In-container `MCPStreamableHTTPTool` | Anthropic healthcare gateway (`hcls.mcp.claude.com`) |
+| PubMed | Clinical | In-container `MCPStreamableHTTPTool` | Anthropic (`pubmed.mcp.claude.com`); stateless |
 
 MCP endpoints are passed to each container as `MCP_*` env vars set in
 `agents/<name>/agent.yaml` (Foundry deploy) and in `docker-compose.yml`
@@ -172,9 +172,9 @@ including the `MCP_*` URLs that each `main.py` reads when constructing
 ```yaml
 # agents/clinical/agent.yaml (excerpt)
 env_vars:
-  MCP_ICD10: https://mcp.deepsense.ai/icd10_codes/mcp
+  MCP_ICD10: https://hcls.mcp.claude.com/icd10_codes/mcp
   MCP_PUBMED: https://pubmed.mcp.claude.com/mcp
-  MCP_CLINICAL_TRIALS: https://mcp.deepsense.ai/clinical_trials/mcp
+  MCP_CLINICAL_TRIALS: https://hcls.mcp.claude.com/clinical_trials/mcp
 ```
 
 ```python
@@ -182,7 +182,7 @@ env_vars:
 tools = [
     MCPStreamableHTTPTool(name="icd10-codes", url=os.environ["MCP_ICD10"],
                           headers={"User-Agent": "claude-code/1.0"}),
-    _ReconnectingMCPTool(name="pubmed", url=os.environ["MCP_PUBMED"]),
+    MCPStreamableHTTPTool(name="pubmed", url=os.environ["MCP_PUBMED"]),
     MCPStreamableHTTPTool(name="clinical-trials", url=os.environ["MCP_CLINICAL_TRIALS"],
                           headers={"User-Agent": "claude-code/1.0"}),
 ]
@@ -193,8 +193,8 @@ agent = Agent(name="clinical-reviewer-agent", tools=tools, ...)
 
 | MCP Server | Provider | Auth Type | Header |
 |-----------|----------|-----------|--------|
-| ICD-10, ClinicalTrials, NPI, CMS | DeepSense | Key-based | `User-Agent: claude-code/1.0` (passed via `MCPStreamableHTTPTool` `headers=`) |
-| PubMed | Anthropic | Unauthenticated | None |
+| ICD-10, ClinicalTrials, NPI, CMS | Anthropic (`hcls.mcp.claude.com`) | Cloudflare anti-bot | `User-Agent: claude-code/1.0` injected defensively (any non-`Python-urllib` UA is accepted) |
+| PubMed | Anthropic (`pubmed.mcp.claude.com`) | Unauthenticated | None |
 
 Authentication headers are stored in Foundry project connections (Key-based auth)
 for portal visibility. Agent containers also handle MCP auth directly via
@@ -381,10 +381,10 @@ This project consumes **remote MCP servers** from the
 
 | MCP Server | Endpoint | Used By | Key Tools |
 |---|---|---|---|
-| **NPI Registry** | `mcp.deepsense.ai/npi_registry/mcp` | Coverage Agent | `npi_validate`, `npi_lookup`, `npi_search` |
-| **ICD-10 Codes** | `mcp.deepsense.ai/icd10_codes/mcp` | Clinical Agent | `validate_code`, `lookup_code`, `search_codes`, `get_hierarchy`, `get_by_category`, `get_by_body_system` |
-| **CMS Coverage** | `mcp.deepsense.ai/cms_coverage/mcp` | Coverage Agent | `search_national_coverage`, `search_local_coverage`, `get_coverage_document`, `get_contractors`, `get_whats_new_report`, `batch_get_ncds`, `sad_exclusion_list` |
-| **Clinical Trials** | `mcp.deepsense.ai/clinical_trials/mcp` | Clinical Agent | `search_trials`, `get_trial_details`, `search_by_eligibility`, `search_investigators`, `analyze_endpoints`, `search_by_sponsor` |
+| **NPI Registry** | `hcls.mcp.claude.com/npi_registry/mcp` | Coverage Agent | `npi_validate`, `npi_lookup`, `npi_search` |
+| **ICD-10 Codes** | `hcls.mcp.claude.com/icd10_codes/mcp` | Clinical Agent | `validate_code`, `lookup_code`, `search_codes`, `get_hierarchy`, `get_by_category`, `get_by_body_system` |
+| **CMS Coverage** | `hcls.mcp.claude.com/cms_coverage/mcp` | Coverage Agent | `search_national_coverage`, `search_local_coverage`, `get_coverage_document`, `get_contractors`, `get_whats_new_report`, `batch_get_ncds`, `sad_exclusion_list` |
+| **Clinical Trials** | `hcls.mcp.claude.com/clinical_trials/mcp` | Clinical Agent | `search_trials`, `get_trial_details`, `search_by_eligibility`, `search_investigators`, `analyze_endpoints`, `search_by_sponsor` |
 | **PubMed** | `pubmed.mcp.claude.com/mcp` | Clinical Agent | `search_articles`, `get_article_metadata`, `find_related_articles`, `lookup_article_by_citation`, `convert_article_ids`, `get_full_text_article`, `get_copyright_status` |
 
 ### How MCP Is Integrated
@@ -395,8 +395,7 @@ agents/<name>/agent.yaml   — Declares MCP_* env vars. The azd ai agent
                              container at create_version() time.
 
 agents/<name>/main.py      — Reads MCP_* env vars and wires each server as
-                             an MCPStreamableHTTPTool (or our
-                             _ReconnectingMCPTool subclass for PubMed) into
+                             an MCPStreamableHTTPTool into
                              Agent(tools=[...]).
     ↓ hosted by
 ResponsesHostServer(agent).run()    — Exposes the dedicated agent endpoint

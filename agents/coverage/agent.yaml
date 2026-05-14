@@ -30,8 +30,10 @@ environment_variables:
   # main.py reads this fallback name and overrides the broken value.
   - name: OTEL_CONNECTION_STRING
     value: ${APPLICATION_INSIGHTS_CONNECTION_STRING}
+  # MCP endpoints — main.py builds MCPStreamableHTTPTool entries from these.
+  # Both MCPs are stateless and live on Anthropic's healthcare gateway.
   - name: MCP_NPI_REGISTRY
-    value: https://mcp.deepsense.ai/npi_registry/mcp
+    value: https://hcls.mcp.claude.com/npi_registry/mcp
   - name: MCP_CMS_COVERAGE
-    value: https://mcp.deepsense.ai/cms_coverage/mcp
+    value: https://hcls.mcp.claude.com/cms_coverage/mcp
 tools: []

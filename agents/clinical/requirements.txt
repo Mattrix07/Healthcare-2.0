@@ -17,13 +17,14 @@ agent-framework-foundry-hosting>=1.0.0a260424
 azure-ai-agentserver-core>=2.0.0b3
 # Managed identity / DefaultAzureCredential
 azure-identity>=1.15.0
-# MCP HTTP client for in-container PubMed tool (the only MCP server still
-# wired in-container — see _ReconnectingMCPTool in main.py for why).
+# Shared httpx client used by all in-container MCPStreamableHTTPTool instances
+# (sets User-Agent and timeout).
 httpx>=0.27.0
+# MCP runtime — required by `MCPStreamableHTTPTool` from agent-framework-core.
+# NOT pulled transitively in the current preview, must be pinned explicitly
+# (mirrors agents/coverage/requirements.txt).
+mcp>=1.0.0
 # Environment variable loading
 python-dotenv>=1.0.0
 # Azure Monitor OpenTelemetry (optional — remove if not using App Insights)
 azure-monitor-opentelemetry>=1.6.0
-# MCP exception types — used by the PubMed reconnect logic
-# (mcp is also pulled transitively by agent-framework-core; pinned here for clarity)
-mcp>=1.0.0

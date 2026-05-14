@@ -225,7 +225,7 @@ AZURE_AI_PROJECT_ENDPOINT=https://<resource-name>.services.ai.azure.com
 AZURE_OPENAI_DEPLOYMENT_NAME=gpt-5.4
 ```
 
-> **MCP tools:** The accelerator wires all five MCP servers **in-container** via `MCPStreamableHTTPTool` inside each agent's `main.py` (PubMed uses our `_ReconnectingMCPTool` subclass to handle ~10 min idle session expiry). MCP endpoints are passed as `MCP_*` env vars from `agents/<name>/agent.yaml` (Foundry) or `docker-compose.yml` (local). The same code paths run in both modes. The refreshed Foundry preview's platform-managed `MCPTool` model is currently rejected by the agent-server runtime, so a single in-container path is used uniformly. See [architecture.md](architecture.md#mcp-integration).
+> **MCP tools:** The accelerator wires all five MCP servers **in-container** via `MCPStreamableHTTPTool` inside each agent's `main.py`. All five MCPs are stateless HTTPS endpoints, so no session-reconnect workarounds are required. MCP endpoints are passed as `MCP_*` env vars from `agents/<name>/agent.yaml` (Foundry) or `docker-compose.yml` (local). The same code paths run in both modes. The refreshed Foundry preview's platform-managed `MCPTool` model is currently rejected by the agent-server runtime, so a single in-container path is used uniformly. See [architecture.md](architecture.md#mcp-integration).
 
 > **Authentication note:** MAF agents use `DefaultAzureCredential` (managed identity on Azure, Azure CLI locally) — no API key required. For local Docker Compose, ensure your local Azure CLI session is active (`az login`) or set `AZURE_CLIENT_ID` / `AZURE_CLIENT_SECRET` if running without CLI auth.
 
@@ -249,15 +249,15 @@ deployments are available.
 <details>
 <summary><b>MCP Server Endpoints</b></summary>
 
-MCP tools are wired **in-container** for all five servers. Each agent's `main.py` instantiates `MCPStreamableHTTPTool` (or our `_ReconnectingMCPTool` subclass for PubMed) directly, reading the URL from an `MCP_*` env var declared in `agents/<name>/agent.yaml` (Foundry) or `docker-compose.yml` (local). The same code paths run in both modes.
+MCP tools are wired **in-container** for all five servers. Each agent's `main.py` instantiates `MCPStreamableHTTPTool` directly, reading the URL from an `MCP_*` env var declared in `agents/<name>/agent.yaml` (Foundry) or `docker-compose.yml` (local). The same code paths run in both modes.
 
 | **MCP Server** | **Endpoint** | **Provider** | **Wiring** | **Purpose** |
 |----------------|-------------|--------------|------------|-------------|
-| ICD-10 Codes | `https://mcp.deepsense.ai/icd10_codes/mcp` | DeepSense | In-container `MCPStreamableHTTPTool` | Diagnosis code lookup |
-| PubMed | `https://pubmed.mcp.claude.com/mcp` | Anthropic | In-container `_ReconnectingMCPTool` | PubMed literature search |
-| Clinical Trials | `https://mcp.deepsense.ai/clinical_trials/mcp` | DeepSense | In-container `MCPStreamableHTTPTool` | Clinical trial search |
-| NPI Registry | `https://mcp.deepsense.ai/npi_registry/mcp` | DeepSense | In-container `MCPStreamableHTTPTool` | Provider NPI validation |
-| CMS Coverage | `https://mcp.deepsense.ai/cms_coverage/mcp` | DeepSense | In-container `MCPStreamableHTTPTool` | Medicare LCD/NCD policies |
+| ICD-10 Codes | `https://hcls.mcp.claude.com/icd10_codes/mcp` | Anthropic | In-container `MCPStreamableHTTPTool` | Diagnosis code lookup |
+| PubMed | `https://pubmed.mcp.claude.com/mcp` | Anthropic | In-container `MCPStreamableHTTPTool` | PubMed literature search |
+| Clinical Trials | `https://hcls.mcp.claude.com/clinical_trials/mcp` | Anthropic | In-container `MCPStreamableHTTPTool` | Clinical trial search |
+| NPI Registry | `https://hcls.mcp.claude.com/npi_registry/mcp` | Anthropic | In-container `MCPStreamableHTTPTool` | Provider NPI validation |
+| CMS Coverage | `https://hcls.mcp.claude.com/cms_coverage/mcp` | Anthropic | In-container `MCPStreamableHTTPTool` | Medicare LCD/NCD policies |
 
 To add a custom MCP server, see [extending.md § Add a New MCP Server](extending.md#add-a-new-mcp-server).
 
@@ -1047,7 +1047,7 @@ FRONTEND_ORIGIN                  →    FRONTEND_ORIGIN
 | **Issue** | **Cause** | **Solution** |
 |-----------|-----------|--------------|
 | Backend health check fails | Port mismatch or dependency error | Check logs: `docker compose logs backend` |
-| MCP server timeouts | Network/firewall blocking MCP endpoints | Verify outbound HTTPS access to `mcp.deepsense.ai` and `pubmed.mcp.claude.com` |
+| MCP server timeouts | Network/firewall blocking MCP endpoints | Verify outbound HTTPS access to `hcls.mcp.claude.com` and `pubmed.mcp.claude.com` |
 | Frontend shows CORS error | `FRONTEND_ORIGIN` mismatch | Set `FRONTEND_ORIGIN` to match the frontend's URL |
 | Container build fails | Docker not running | Start Docker Desktop and retry |
 | Azure quota exceeded | Insufficient gpt-5.4 model quota | Check quota in Microsoft Foundry under **Build → Deployments** (see Step 1.3) |

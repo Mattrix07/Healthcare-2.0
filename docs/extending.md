@@ -44,8 +44,7 @@ def main() -> None:
     # MCP tools are wired in-container via MCPStreamableHTTPTool. Read the
     # MCP_* env var declared in agents/<name>/agent.yaml (Foundry deploy) or
     # docker-compose.yml (local dev) and append to `tools` below. See
-    # agents/clinical/main.py for a working example, including the
-    # _ReconnectingMCPTool subclass for PubMed's session-expiry quirk.
+    # agents/clinical/main.py for a working example.
 
     skills_provider = SkillsProvider(
         skill_paths=str(Path(__file__).parent / "skills")
@@ -89,7 +88,7 @@ Key conventions:
 - `name`, `instructions`, `tools`, `context_providers`, and `default_options` all go on `Agent(...)`
 - `SkillsProvider` is passed via `context_providers=[skills_provider]`
 - `default_options` must include `"store": False` because the refreshed preview manages conversation history at the platform level
-- **MCP tools are wired in-container** via `MCPStreamableHTTPTool` — read the URL from an `MCP_*` env var declared in `agents/<name>/agent.yaml`. Use our `_ReconnectingMCPTool` subclass for servers with session-expiry quirks (see clinical agent's PubMed wiring)
+- **MCP tools are wired in-container** via `MCPStreamableHTTPTool` — read the URL from an `MCP_*` env var declared in `agents/<name>/agent.yaml`. The base class handles transport-level reconnects automatically; all current MCPs in this accelerator are stateless and need no extra wrapping
 - `load_dotenv(override=True)` is required — `override=True` ensures env vars set by the `azd ai agent` extension take precedence
 
 > **Alternative — Foundry-hosted Tools (preview).** If your MCP servers are
@@ -164,9 +163,10 @@ tools = [
 agent = Agent(client=chat_client, tools=tools, ...)
 ```
 
-For servers with session-expiry quirks, subclass `MCPStreamableHTTPTool` and
-catch `McpError('Session terminated')` (see `agents/clinical/main.py`'s
-`_ReconnectingMCPTool`).
+For servers with session-expiry quirks, you can subclass
+`MCPStreamableHTTPTool` and override `call_tool()` to catch
+`McpError('Session terminated')` and reconnect. None of the current MCPs in
+this accelerator require this workaround — all five are stateless.
 
 See [Add a New MCP Server](#add-a-new-mcp-server) for the full pattern.
 
@@ -311,8 +311,8 @@ agent = Agent(client=chat_client, tools=tools, ...)
 ```
 
 For servers with session-expiry quirks, subclass `MCPStreamableHTTPTool` and
-catch `McpError('Session terminated')` to reconnect (see
-`agents/clinical/main.py`'s `_ReconnectingMCPTool`).
+catch `McpError('Session terminated')` to reconnect. None of the MCPs
+currently used by this accelerator need this workaround — all are stateless.
 
 ### Step 4 — Orchestrator
 

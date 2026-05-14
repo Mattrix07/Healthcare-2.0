@@ -50,26 +50,20 @@ the full rationale.
 | Clinical Trials | In-container `MCPStreamableHTTPTool` | `agents/clinical/main.py` (URL from `MCP_CLINICAL_TRIALS` env var) |
 | NPI Registry | In-container `MCPStreamableHTTPTool` | `agents/coverage/main.py` (URL from `MCP_NPI_REGISTRY` env var) |
 | CMS Coverage | In-container `MCPStreamableHTTPTool` | `agents/coverage/main.py` (URL from `MCP_CMS_COVERAGE` env var) |
-| PubMed | In-container `_ReconnectingMCPTool` | `agents/clinical/main.py` (URL from `MCP_PUBMED` env var) |
+| PubMed | In-container `MCPStreamableHTTPTool` | `agents/clinical/main.py` (URL from `MCP_PUBMED` env var) |
 
-The DeepSense MCP servers (ICD-10, Clinical Trials, NPI Registry, CMS
-Coverage) require a `User-Agent: claude-code/1.0` header for CloudFront
-auth — each agent injects it via a shared `httpx.AsyncClient`. PubMed has no
-auth header requirement.
+Four of the five MCPs (ICD-10, Clinical Trials, NPI Registry, CMS Coverage)
+live on Anthropic's healthcare gateway at `hcls.mcp.claude.com`; PubMed
+has its own subdomain at `pubmed.mcp.claude.com`. All five are stateless
+HTTPS endpoints — no session-expiry workarounds are required. Each agent
+injects `User-Agent: claude-code/1.0` via a shared `httpx.AsyncClient` as
+defensive insurance because the Cloudflare gateway blocks the default
+`Python-urllib/*` UA but accepts any other identifier.
 
 In both Foundry deployment (`agent.yaml` `environment_variables`) and
 docker-compose local dev (`docker-compose.yml`), the `MCP_*` env vars are
-set with the same DeepSense URLs as defaults, so the in-container wiring
-behaves identically across modes.
-
-### PubMed Session Reconnect (in-container path)
-
-PubMed's MCP server terminates idle sessions after ~10 minutes. The clinical
-agent uses `_ReconnectingMCPTool` — a subclass of `MCPStreamableHTTPTool` that
-catches `McpError('Session terminated')` and auto-reconnects with a fresh
-session. The platform MCP runtime does not currently expose a session-expiry
-reconnect hook, so this in-container workaround is needed for any long-lived
-MCP session (PubMed is the only one in this project that hits the idle limit).
+set with the same Anthropic-hosted URLs as defaults, so the in-container
+wiring behaves identically across modes.
 
 ---
 

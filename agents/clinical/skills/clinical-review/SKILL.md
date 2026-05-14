@@ -46,8 +46,10 @@ and structure the clinical narrative for downstream coverage assessment.
 - `search_trials(query, status, phase, limit)` — Search ClinicalTrials.gov for
   trials matching a condition or intervention.
 - `get_trial_details(nct_id)` — Get comprehensive details for a specific trial.
-- `search_by_eligibility(condition, age, gender, limit)` — Find trials matching
-  specific patient eligibility criteria.
+- `search_by_eligibility(condition, min_age, max_age, sex, eligibility_keywords, page_size)` —
+  Find trials matching specific patient eligibility criteria. `min_age`/`max_age`
+  use ClinicalTrials.gov string format (e.g. `"18 Years"`, `"6 Months"`); `sex`
+  is one of `"all"`, `"male"`, `"female"`.
 - `search_investigators(name, organization, limit)` — Search for trial
   investigators by name or organization.
 - `analyze_endpoints(nct_id)` — Analyze the primary and secondary endpoints

@@ -26,27 +26,6 @@ The backend logs show an auth error when trying to invoke a hosted agent.
 
 ---
 
-## PubMed MCP: "Session terminated" / search_articles Fails
-
-PubMed literature search fails with `search_articles: PubMed search failed` but
-other MCP tools (ICD-10, Clinical Trials, NPI, CMS) work fine.
-
-**Cause:** PubMed's MCP server (`pubmed.mcp.claude.com`) terminates idle sessions
-after ~10 minutes. The agent container reuses the same MCP session across requests.
-If the session has been idle too long between user submissions, PubMed responds
-with `McpError("Session terminated")`.
-
-**Fix (already applied):** The clinical agent uses `_ReconnectingMCPTool` — a
-subclass of `MCPStreamableHTTPTool` that catches `Session terminated` errors
-and automatically reconnects with a fresh session. See `agents/clinical/main.py`.
-
-If you still see this error, check:
-1. The container image was rebuilt after the fix (`azd up`)
-2. The agent revision includes the `_ReconnectingMCPTool` change (check the
-   image tag via `az rest --method GET --url "${BASE_URL}/agents/clinical-reviewer-agent?api-version=v1" --resource "https://ai.azure.com"`)
-
----
-
 ## Agent Returns "ID cannot be null or empty" / status: "failed"
 
 All agent calls fail with `400 - ID cannot be null or empty` or return

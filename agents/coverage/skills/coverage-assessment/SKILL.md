@@ -111,14 +111,14 @@ the procedure LCD). **Limit to 3 search passes maximum** — do not keep
 searching indefinitely.
 
 **Search pass 1 — CPT/HCPCS code as keyword:**
-1. Call `mcp__cms-coverage__search_local_coverage(keyword="<CPT code>", document_type="LCD", limit=10)`
+1. Call `mcp__cms-coverage__search_local_coverage(keyword="<CPT code>", document_type="lcd", limit=10)`
    using the actual CPT/HCPCS code number (e.g., "31628").
-2. Call `mcp__cms-coverage__search_national_coverage(keyword="<CPT code>", document_type="NCD", limit=10)`.
+2. Call `mcp__cms-coverage__search_national_coverage(keyword="<CPT code>", document_type="ncd", limit=10)`.
 
 **Search pass 2 — Procedure name (if pass 1 returns no relevant results):**
-3. Call `mcp__cms-coverage__search_local_coverage(keyword="<procedure name>", document_type="LCD", limit=10)`
+3. Call `mcp__cms-coverage__search_local_coverage(keyword="<procedure name>", document_type="lcd", limit=10)`
    using the procedure's clinical name (e.g., "transbronchial lung biopsy").
-4. Call `mcp__cms-coverage__search_national_coverage(keyword="<procedure name>", document_type="NCD", limit=10)`.
+4. Call `mcp__cms-coverage__search_national_coverage(keyword="<procedure name>", document_type="ncd", limit=10)`.
 
 **Search pass 3 — Broader category (if passes 1-2 return no relevant results):**
 5. Try a broader category keyword (e.g., "diagnostic bronchoscopy" instead of
@@ -160,8 +160,8 @@ payer-specific policies may differ."
 #### Step 4: Get Policy Details
 
 For each relevant NCD/LCD found:
-- Call `mcp__cms-coverage__get_coverage_document(document_id=..., document_type="LCD")` for LCDs
-  or `mcp__cms-coverage__get_coverage_document(document_id=..., document_type="NCD")` for NCDs
+- Call `mcp__cms-coverage__get_coverage_document(document_id=..., document_type="lcd")` for LCDs
+  or `mcp__cms-coverage__get_coverage_document(document_id=..., document_type="ncd")` for NCDs
 - Use `mcp__cms-coverage__batch_get_ncds(ncd_ids=[...])` if multiple NCDs apply
 - Extract coverage criteria, covered indications, documentation requirements,
   and exclusions

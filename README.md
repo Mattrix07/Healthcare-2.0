@@ -32,7 +32,7 @@ Decision policy and evaluation methodology adapted from the [Anthropic prior-aut
 - **Multi-agent parallel execution** — Four specialized agents complete a full PA review in under 2 minutes; Compliance and Clinical agents run concurrently via `asyncio.gather`
 - **Foundry Hosted Agents** — Each specialist agent is independently containerized and deployed on Microsoft Foundry; Foundry manages the container lifecycle
 - **Gate-based decision rubric** — Three sequential gates (Provider → Codes → Medical Necessity) with per-criterion MET/NOT_MET/INSUFFICIENT scoring and confidence weighting
-- **MCP-powered data access** — Five remote MCP healthcare data servers: NPI Registry, ICD-10 Codes, CMS Coverage, Clinical Trials (DeepSense), and PubMed
+- **MCP-powered data access** — Five remote MCP healthcare data servers from Anthropic's healthcare gateway: NPI Registry, ICD-10 Codes, CMS Coverage, Clinical Trials, and PubMed
 - **Human-in-the-loop** — AI produces draft recommendations; clinicians Accept or Override with documented rationale; override traceability flows to audit PDF and notification letters
 - **Keyless authentication** — All Azure resource access via `DefaultAzureCredential`; no API keys, passwords, or connection strings stored or rotated
 - **Full audit trail** — 10-item compliance checklist, per-criterion confidence scoring, and an 8-section audit justification document (Markdown + color-coded PDF)
@@ -170,10 +170,9 @@ The orchestrator coordinates four phases with four specialized agents:
 <details>
   <summary><b>MCP-powered data access</b></summary>
 
-  - Five remote MCP servers: NPI Registry, ICD-10 Codes, CMS Coverage, Clinical Trials (DeepSense), PubMed (Anthropic Healthcare MCP)
+  - Five remote MCP servers from Anthropic's healthcare gateway: NPI Registry, ICD-10 Codes, CMS Coverage, and Clinical Trials on `hcls.mcp.claude.com`; PubMed on `pubmed.mcp.claude.com`
   - Each agent container calls MCP servers directly via `MCPStreamableHTTPTool` (configured via `MCP_*` env vars)
-  - DeepSense servers use Key-based auth with `User-Agent: claude-code/1.0` header (handled by a shared `httpx.AsyncClient` in each agent container); PubMed uses unauthenticated access
-  - PubMed uses `_ReconnectingMCPTool` to auto-reconnect on idle session expiry (~10 min TTL)
+  - All five MCPs are stateless HTTPS endpoints — no session-expiry handling required. The shared `httpx.AsyncClient` injects `User-Agent: claude-code/1.0` defensively (the Cloudflare gateway blocks the default `Python-urllib` UA but accepts any other identifier)
   - All agents use `FoundryChatClient` with gpt-5.4 on Microsoft Foundry (refreshed preview)
 </details>
 

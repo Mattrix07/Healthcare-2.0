@@ -174,7 +174,7 @@ the public internet. In production this creates several operational risks:
 - **No central rate limiting** — a misbehaving or hallucinating agent can flood a 3rd-party endpoint with unlimited requests.
 - **No fallback** — if a 3rd-party MCP server goes down, every agent fails independently with no circuit-breaker protection.
 - **No audit trail** — MCP tool calls are invisible at the infrastructure level; you only see them in application logs.
-- **Custom HTTP client overhead** — each agent creates a custom `httpx.AsyncClient` solely to inject the `User-Agent` header required by DeepSense CloudFront routing (see `_MCP_HTTP_CLIENT` in any agent `main.py`).
+- **Custom HTTP client overhead** — each agent creates a custom `httpx.AsyncClient` solely to inject a `User-Agent` header so requests are not blocked by the Cloudflare gateway in front of `hcls.mcp.claude.com` (which rejects the default `Python-urllib/*` UA). See `_MCP_HTTP_CLIENT` in any agent `main.py`.
 
 Azure API Management's **native MCP Gateway** feature
 ([docs](https://learn.microsoft.com/en-us/azure/api-management/expose-existing-mcp-server))
@@ -237,11 +237,11 @@ MAF Hosted Agents (Azure AI Foundry)
   ├── agent-coverage  ──┤
   ├── agent-compliance──┤──► APIM MCP Gateway (https://<apim>.azure-api.net/)
   └── agent-synthesis ──┘         │
-                                  │── /icd10-mcp/mcp      → mcp.deepsense.ai/icd10_codes/mcp
+                                  │── /icd10-mcp/mcp      → hcls.mcp.claude.com/icd10_codes/mcp
                                   │── /pubmed-mcp/mcp     → pubmed.mcp.claude.com/mcp
-                                  │── /trials-mcp/mcp     → mcp.deepsense.ai/clinical_trials/mcp
-                                  │── /npi-mcp/mcp        → mcp.deepsense.ai/npi_registry/mcp
-                                  └── /cms-mcp/mcp        → mcp.deepsense.ai/cms_coverage/mcp
+                                  │── /trials-mcp/mcp     → hcls.mcp.claude.com/clinical_trials/mcp
+                                  │── /npi-mcp/mcp        → hcls.mcp.claude.com/npi_registry/mcp
+                                  └── /cms-mcp/mcp        → hcls.mcp.claude.com/cms_coverage/mcp
 ```
 
 ### What APIM MCP Gateway Adds
@@ -249,7 +249,7 @@ MAF Hosted Agents (Azure AI Foundry)
 | Capability | How |
 |---|---|
 | **Native MCP protocol** | APIM speaks MCP natively — no custom streaming/buffering policies needed |
-| **Centralized header injection** | `User-Agent: claude-code/1.0` and other headers managed via `<set-header>` policy — removed from Python code |
+| **Centralized header injection** | `User-Agent: claude-code/1.0` and other headers managed via `<set-header>` policy — removed from Python code (still useful as defense-in-depth even though Anthropic-hosted endpoints don't strictly require a specific UA) |
 | **API key storage** | Named Values backed by Key Vault — never in Container App env vars |
 | **Rate limiting** | `<rate-limit-by-key>` policy per MCP backend, keyed by `Mcp-Session-Id` |
 | **Circuit breaker** | `<retry>` + mock policy fallback if 3rd-party goes down |
@@ -267,7 +267,7 @@ be done via the Azure Portal or Bicep:
 **Portal:**
 1. Navigate to your APIM instance → **APIs** → **MCP Servers** → **+ Create MCP server**
 2. Select **Expose an existing MCP server**
-3. Enter the backend MCP server base URL (e.g. `https://mcp.deepsense.ai/icd10_codes/mcp`)
+3. Enter the backend MCP server base URL (e.g. `https://hcls.mcp.claude.com/icd10_codes/mcp`)
 4. Set Transport type to **Streamable HTTP**
 5. Enter a Name (e.g. `icd10-codes`) and Base path (e.g. `icd10-mcp`)
 6. Click **Create**
@@ -288,7 +288,7 @@ resource icd10McpServer 'Microsoft.ApiManagement/service/apis@2024-06-01-preview
     path: 'icd10-mcp'
     protocols: ['https']
     type: 'mcp'
-    serviceUrl: 'https://mcp.deepsense.ai/icd10_codes/mcp'
+    serviceUrl: 'https://hcls.mcp.claude.com/icd10_codes/mcp'
   }
 }
 
@@ -297,15 +297,16 @@ resource icd10McpServer 'Microsoft.ApiManagement/service/apis@2024-06-01-preview
 
 #### 2. Configure Policies (Header Injection)
 
-The external DeepSense MCP servers require a specific `User-Agent` header
-to avoid CloudFront 301 redirects. Apply an inbound policy to inject this
-header centrally:
+The external Anthropic-hosted MCP servers sit behind a Cloudflare gateway
+that blocks the default `Python-urllib/*` User-Agent but accepts any other
+identifier. Apply an inbound policy to inject a stable UA centrally:
 
 ```xml
 <policies>
     <inbound>
         <base />
-        <!-- DeepSense CloudFront requires this User-Agent to route MCP traffic -->
+        <!-- Inject a stable User-Agent so the Cloudflare gateway in front of
+             hcls.mcp.claude.com does not block the request as a generic bot -->
         <set-header name="User-Agent" exists-action="override">
             <value>claude-code/1.0</value>
         </set-header>
@@ -322,7 +323,7 @@ header centrally:
 </policies>
 ```
 
-Apply this policy to each MCP server that routes to DeepSense endpoints.
+Apply this policy to each MCP server that routes to the Anthropic-hosted endpoints.
 
 #### 3. Configure Rate Limiting (Optional but Recommended)
 
@@ -353,7 +354,7 @@ to point at the APIM MCP Gateway URLs:
 
 ```bicep
 // Before (direct internet call):
-{ name: 'MCP_ICD10_CODES', value: 'https://mcp.deepsense.ai/icd10_codes/mcp' }
+{ name: 'MCP_ICD10_CODES', value: 'https://hcls.mcp.claude.com/icd10_codes/mcp' }
 
 // After (via APIM MCP Gateway):
 { name: 'MCP_ICD10_CODES', value: '${apim.outputs.gatewayUrl}/icd10-mcp/mcp' }
@@ -390,11 +391,11 @@ icd10_tool = MCPStreamableHTTPTool(
 
 | Variable | Current value (direct) | APIM MCP Gateway value |
 |---|---|---|
-| `MCP_ICD10_CODES` | `https://mcp.deepsense.ai/icd10_codes/mcp` | `https://<apim>.azure-api.net/icd10-mcp/mcp` |
+| `MCP_ICD10_CODES` | `https://hcls.mcp.claude.com/icd10_codes/mcp` | `https://<apim>.azure-api.net/icd10-mcp/mcp` |
 | `MCP_PUBMED` | `https://pubmed.mcp.claude.com/mcp` | `https://<apim>.azure-api.net/pubmed-mcp/mcp` |
-| `MCP_CLINICAL_TRIALS` | `https://mcp.deepsense.ai/clinical_trials/mcp` | `https://<apim>.azure-api.net/trials-mcp/mcp` |
-| `MCP_NPI_REGISTRY` | `https://mcp.deepsense.ai/npi_registry/mcp` | `https://<apim>.azure-api.net/npi-mcp/mcp` |
-| `MCP_CMS_COVERAGE` | `https://mcp.deepsense.ai/cms_coverage/mcp` | `https://<apim>.azure-api.net/cms-mcp/mcp` |
+| `MCP_CLINICAL_TRIALS` | `https://hcls.mcp.claude.com/clinical_trials/mcp` | `https://<apim>.azure-api.net/trials-mcp/mcp` |
+| `MCP_NPI_REGISTRY` | `https://hcls.mcp.claude.com/npi_registry/mcp` | `https://<apim>.azure-api.net/npi-mcp/mcp` |
+| `MCP_CMS_COVERAGE` | `https://hcls.mcp.claude.com/cms_coverage/mcp` | `https://<apim>.azure-api.net/cms-mcp/mcp` |
 
 > All five MCP servers are wired in-container via `MCPStreamableHTTPTool`
 > (URLs read from the `MCP_*` env vars above), so switching to APIM only

@@ -41,9 +41,10 @@ from schemas import CoverageResult
 load_dotenv(override=True)  # override=True required for Foundry-deployed env vars
 
 
-# Shared httpx client for the in-container MCP tools.
-# DeepSense CloudFront routes auth on `User-Agent: claude-code/1.0`, so this
-# UA is required for both NPI Registry and CMS Coverage.
+# Shared httpx client for the in-container MCP tools. The explicit
+# `User-Agent: claude-code/1.0` header is defensive insurance: Cloudflare
+# (the gateway in front of hcls.mcp.claude.com) blocks the default
+# `Python-urllib/*` UA but accepts any other identifier.
 _MCP_HTTP_CLIENT = httpx.AsyncClient(
     headers={"User-Agent": "claude-code/1.0"},
     timeout=httpx.Timeout(60.0),

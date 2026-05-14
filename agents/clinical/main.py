@@ -12,12 +12,12 @@ Deployed as a Foundry Hosted Agent using the refreshed preview stack:
 MCP wiring (all in-container):
   - ICD-10 codes  : MCPStreamableHTTPTool, URL from MCP_ICD10_CODES env var
   - Clinical Trials: MCPStreamableHTTPTool, URL from MCP_CLINICAL_TRIALS env var
-  - PubMed        : `_ReconnectingMCPTool` — the platform MCP runtime does
-                    not expose a session-expiry reconnect hook, and PubMed
-                    terminates idle sessions after ~10 minutes. The reconnect
-                    workaround is the reason all 3 MCPs run in-container
-                    instead of as Foundry Toolbox tools.
-                    See docs/architecture.md § "MCP Integration".
+  - PubMed        : MCPStreamableHTTPTool, URL from MCP_PUBMED env var
+
+All three MCPs are stateless HTTPS endpoints on Anthropic's healthcare
+gateway and can be swapped via env var without code changes. See
+docs/architecture.md § "MCP Integration" for the rationale on the
+in-container wiring choice (vs. the Foundry-managed Toolbox model).
 
 Structured output is enforced via default_options={"response_format": ClinicalResult},
 which the host passes through to every agent.run() call. The `store: False`
@@ -31,7 +31,6 @@ from pathlib import Path
 
 import httpx
 from agent_framework import Agent, MCPStreamableHTTPTool, SkillsProvider
-from agent_framework.exceptions import ToolExecutionException
 from agent_framework.foundry import FoundryChatClient
 from agent_framework_foundry_hosting import ResponsesHostServer
 from azure.identity import (
@@ -41,48 +40,20 @@ from azure.identity import (
     ManagedIdentityCredential,
 )
 from dotenv import load_dotenv
-from mcp.shared.exceptions import McpError
 
 from schemas import ClinicalResult
 
 load_dotenv(override=True)  # override=True required for Foundry-deployed env vars
 
 
-# Shared httpx client for the in-container MCP tools.
-# DeepSense CloudFront routes auth on `User-Agent: claude-code/1.0`, so this
-# UA is required for ICD-10 and Clinical Trials. PubMed does not check the
-# UA, so a single shared client works for all three.
+# Shared httpx client for the in-container MCP tools. The explicit
+# `User-Agent: claude-code/1.0` header is defensive insurance: Cloudflare
+# (the gateway in front of hcls.mcp.claude.com) blocks the default
+# `Python-urllib/*` UA but accepts any other identifier.
 _MCP_HTTP_CLIENT = httpx.AsyncClient(
     headers={"User-Agent": "claude-code/1.0"},
     timeout=httpx.Timeout(60.0),
 )
-
-
-class _ReconnectingMCPTool(MCPStreamableHTTPTool):
-    """MCPStreamableHTTPTool that auto-reconnects on expired MCP sessions.
-
-    PubMed's MCP server (pubmed.mcp.claude.com) terminates idle sessions
-    after ~10 minutes. The base class retries on ClosedResourceError (TCP
-    disconnect) but not on McpError('Session terminated') (MCP-level session
-    expiry). This subclass catches both and reconnects once.
-
-    # This is the *only* reason PubMed and the other MCPs are wired
-    # in-container instead of via the Foundry Toolbox — the platform MCP
-    # runtime does not currently expose a session-expiry reconnect hook.
-    """
-
-    async def call_tool(self, tool_name: str, **kwargs) -> str:
-        try:
-            return await super().call_tool(tool_name, **kwargs)
-        except ToolExecutionException as exc:
-            if exc.__cause__ and isinstance(exc.__cause__, McpError) and "Session terminated" in str(exc.__cause__):
-                import logging
-                logging.getLogger(__name__).info(
-                    "MCP session expired for %s. Reconnecting...", self.name
-                )
-                await self.connect(reset=True)
-                return await super().call_tool(tool_name, **kwargs)
-            raise
 
 
 def main() -> None:
@@ -127,7 +98,6 @@ def main() -> None:
     # --- MCP tools (all in-container) ---
     # ICD-10, Clinical Trials, and PubMed are wired here from MCP_* env vars
     # set by agents/clinical/agent.yaml (Foundry) or docker-compose.yml (local).
-    # PubMed uses `_ReconnectingMCPTool` for session-expiry recovery.
     tools = []
     if os.environ.get("MCP_ICD10_CODES"):
         tools.append(MCPStreamableHTTPTool(
@@ -137,13 +107,14 @@ def main() -> None:
             http_client=_MCP_HTTP_CLIENT,
             load_prompts=False,
         ))
-    tools.append(_ReconnectingMCPTool(
-        name="pubmed",
-        description="Search biomedical literature on PubMed",
-        url=os.environ["MCP_PUBMED"],
-        http_client=_MCP_HTTP_CLIENT,
-        load_prompts=False,
-    ))
+    if os.environ.get("MCP_PUBMED"):
+        tools.append(MCPStreamableHTTPTool(
+            name="pubmed",
+            description="Search biomedical literature on PubMed",
+            url=os.environ["MCP_PUBMED"],
+            http_client=_MCP_HTTP_CLIENT,
+            load_prompts=False,
+        ))
     if os.environ.get("MCP_CLINICAL_TRIALS"):
         tools.append(MCPStreamableHTTPTool(
             name="clinical-trials",

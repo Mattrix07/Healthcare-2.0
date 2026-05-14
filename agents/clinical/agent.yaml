@@ -35,10 +35,12 @@ environment_variables:
   - name: OTEL_CONNECTION_STRING
     value: ${APPLICATION_INSIGHTS_CONNECTION_STRING}
   # MCP endpoints — main.py builds MCPStreamableHTTPTool entries from these.
+  # All MCPs are stateless and live on Anthropic's healthcare gateway
+  # (hcls.mcp.claude.com); PubMed is on its own subdomain.
   - name: MCP_ICD10_CODES
-    value: https://mcp.deepsense.ai/icd10_codes/mcp
+    value: https://hcls.mcp.claude.com/icd10_codes/mcp
   - name: MCP_PUBMED
     value: https://pubmed.mcp.claude.com/mcp
   - name: MCP_CLINICAL_TRIALS
-    value: https://mcp.deepsense.ai/clinical_trials/mcp
+    value: https://hcls.mcp.claude.com/clinical_trials/mcp
 tools: []
