@@ -33,8 +33,12 @@ param deploymentSkuName string = 'GlobalStandard'
 param imagesBuilt string = ''
 
 // MCP server URLs (ICD-10, PubMed, ClinicalTrials.gov, NPI Registry, CMS Coverage)
-// are configured in the agent code (`agents/<name>/main.py`) and can be overridden at
-// runtime via container-app environment variables (`MCP_*_URL`) without redeployment.
+// are configured in each agent's `agent.yaml` (`MCP_ICD10_CODES`, `MCP_PUBMED`,
+// `MCP_CLINICAL_TRIALS`, `MCP_NPI_REGISTRY`, `MCP_CMS_COVERAGE`) and consumed
+// in-container by `agents/<name>/main.py`. The `azd ai agent` extension
+// propagates these into the running container at create_version() time, so they
+// can be overridden by editing `agent.yaml` and re-running `azd up` without
+// touching this Bicep template.
 
 // ── Variables ───────────────────────────────────────────────────────────────
 

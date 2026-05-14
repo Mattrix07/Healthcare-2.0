@@ -172,19 +172,41 @@ including the `MCP_*` URLs that each `main.py` reads when constructing
 ```yaml
 # agents/clinical/agent.yaml (excerpt)
 env_vars:
-  MCP_ICD10: https://hcls.mcp.claude.com/icd10_codes/mcp
+  MCP_ICD10_CODES: https://hcls.mcp.claude.com/icd10_codes/mcp
   MCP_PUBMED: https://pubmed.mcp.claude.com/mcp
   MCP_CLINICAL_TRIALS: https://hcls.mcp.claude.com/clinical_trials/mcp
 ```
 
 ```python
 # agents/clinical/main.py (simplified)
+# Shared httpx client — a single AsyncClient is reused across every MCP tool
+# so the User-Agent header is only configured in one place. Cloudflare in front
+# of hcls.mcp.claude.com blocks the default Python-urllib UA, so the explicit
+# claude-code/1.0 header is defensive insurance.
+_MCP_HTTP_CLIENT = httpx.AsyncClient(
+    headers={"User-Agent": "claude-code/1.0"},
+    timeout=httpx.Timeout(60.0),
+)
+
 tools = [
-    MCPStreamableHTTPTool(name="icd10-codes", url=os.environ["MCP_ICD10"],
-                          headers={"User-Agent": "claude-code/1.0"}),
-    MCPStreamableHTTPTool(name="pubmed", url=os.environ["MCP_PUBMED"]),
-    MCPStreamableHTTPTool(name="clinical-trials", url=os.environ["MCP_CLINICAL_TRIALS"],
-                          headers={"User-Agent": "claude-code/1.0"}),
+    MCPStreamableHTTPTool(
+        name="icd10-codes",
+        url=os.environ["MCP_ICD10_CODES"],
+        http_client=_MCP_HTTP_CLIENT,
+        load_prompts=False,  # refreshed preview: skip prompts/list at startup
+    ),
+    MCPStreamableHTTPTool(
+        name="pubmed",
+        url=os.environ["MCP_PUBMED"],
+        http_client=_MCP_HTTP_CLIENT,
+        load_prompts=False,
+    ),
+    MCPStreamableHTTPTool(
+        name="clinical-trials",
+        url=os.environ["MCP_CLINICAL_TRIALS"],
+        http_client=_MCP_HTTP_CLIENT,
+        load_prompts=False,
+    ),
 ]
 agent = Agent(name="clinical-reviewer-agent", tools=tools, ...)
 ```
