@@ -12,8 +12,8 @@ services:
       # Local demo mode bypasses Azure Foundry/MCP-backed agent calls and returns
       # deterministic, schema-shaped demo outputs for the research prototype UI.
       - DEMO_MODE=${DEMO_MODE:-true}
-      # All 4 agent containers run separately when DEMO_MODE=false.
-      # Backend calls them over HTTP — URLs are set to Docker service names.
+      # These URLs are used only when DEMO_MODE=false and the azure-agents
+      # profile is enabled.
       - HOSTED_AGENT_CLINICAL_URL=http://agent-clinical:8088
       - HOSTED_AGENT_COVERAGE_URL=http://agent-coverage:8088
       - HOSTED_AGENT_COMPLIANCE_URL=http://agent-compliance:8088
@@ -25,15 +25,6 @@ services:
       # - ENABLE_OTEL_SENSITIVE_DATA=${ENABLE_OTEL_SENSITIVE_DATA:-false}
     env_file:
       - ./backend/.env
-    depends_on:
-      agent-clinical:
-        condition: service_healthy
-      agent-coverage:
-        condition: service_healthy
-      agent-compliance:
-        condition: service_healthy
-      agent-synthesis:
-        condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s
@@ -43,8 +34,10 @@ services:
 
   # ---------------------------------------------------------------------------
   # Clinical Reviewer Agent — ICD-10, PubMed, Clinical Trials MCP
+  # Starts only when explicitly enabled: docker compose --profile azure-agents up
   # ---------------------------------------------------------------------------
   agent-clinical:
+    profiles: ["azure-agents"]
     build:
       context: ./agents/clinical
       dockerfile: Dockerfile
@@ -57,7 +50,6 @@ services:
       - MCP_PUBMED=${MCP_PUBMED:-https://pubmed.mcp.claude.com/mcp}
       - MCP_CLINICAL_TRIALS=${MCP_CLINICAL_TRIALS:-https://hcls.mcp.claude.com/clinical_trials/mcp}
       - APPLICATION_INSIGHTS_CONNECTION_STRING=${APPLICATION_INSIGHTS_CONNECTION_STRING:-}
-      # OTel sensitive-data capture (PHI risk — local dev only). Default: false.
       - ENABLE_OTEL_SENSITIVE_DATA=${ENABLE_OTEL_SENSITIVE_DATA:-false}
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8088/readiness"]
@@ -68,8 +60,10 @@ services:
 
   # ---------------------------------------------------------------------------
   # Coverage Assessment Agent — NPI Registry, CMS Coverage MCP
+  # Starts only when explicitly enabled: docker compose --profile azure-agents up
   # ---------------------------------------------------------------------------
   agent-coverage:
+    profiles: ["azure-agents"]
     build:
       context: ./agents/coverage
       dockerfile: Dockerfile
@@ -81,7 +75,6 @@ services:
       - MCP_NPI_REGISTRY=${MCP_NPI_REGISTRY:-https://hcls.mcp.claude.com/npi_registry/mcp}
       - MCP_CMS_COVERAGE=${MCP_CMS_COVERAGE:-https://hcls.mcp.claude.com/cms_coverage/mcp}
       - APPLICATION_INSIGHTS_CONNECTION_STRING=${APPLICATION_INSIGHTS_CONNECTION_STRING:-}
-      # OTel sensitive-data capture (PHI risk — local dev only). Default: false.
       - ENABLE_OTEL_SENSITIVE_DATA=${ENABLE_OTEL_SENSITIVE_DATA:-false}
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8088/readiness"]
@@ -92,8 +85,10 @@ services:
 
   # ---------------------------------------------------------------------------
   # Compliance Validation Agent — pure reasoning, no MCP tools
+  # Starts only when explicitly enabled: docker compose --profile azure-agents up
   # ---------------------------------------------------------------------------
   agent-compliance:
+    profiles: ["azure-agents"]
     build:
       context: ./agents/compliance
       dockerfile: Dockerfile
@@ -103,7 +98,6 @@ services:
       - AZURE_AI_PROJECT_ENDPOINT=${AZURE_AI_PROJECT_ENDPOINT}
       - AZURE_OPENAI_DEPLOYMENT_NAME=${AZURE_OPENAI_DEPLOYMENT_NAME:-gpt-5.4}
       - APPLICATION_INSIGHTS_CONNECTION_STRING=${APPLICATION_INSIGHTS_CONNECTION_STRING:-}
-      # OTel sensitive-data capture (PHI risk — local dev only). Default: false.
       - ENABLE_OTEL_SENSITIVE_DATA=${ENABLE_OTEL_SENSITIVE_DATA:-false}
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8088/readiness"]
@@ -114,8 +108,10 @@ services:
 
   # ---------------------------------------------------------------------------
   # Synthesis Decision Agent — pure reasoning, no MCP tools
+  # Starts only when explicitly enabled: docker compose --profile azure-agents up
   # ---------------------------------------------------------------------------
   agent-synthesis:
+    profiles: ["azure-agents"]
     build:
       context: ./agents/synthesis
       dockerfile: Dockerfile
@@ -125,7 +121,6 @@ services:
       - AZURE_AI_PROJECT_ENDPOINT=${AZURE_AI_PROJECT_ENDPOINT}
       - AZURE_OPENAI_DEPLOYMENT_NAME=${AZURE_OPENAI_DEPLOYMENT_NAME:-gpt-5.4}
       - APPLICATION_INSIGHTS_CONNECTION_STRING=${APPLICATION_INSIGHTS_CONNECTION_STRING:-}
-      # OTel sensitive-data capture (PHI risk — local dev only). Default: false.
       - ENABLE_OTEL_SENSITIVE_DATA=${ENABLE_OTEL_SENSITIVE_DATA:-false}
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8088/readiness"]
