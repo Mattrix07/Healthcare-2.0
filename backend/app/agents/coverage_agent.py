@@ -5,6 +5,7 @@ import logging
 from app.config import settings
 from app.services.hosted_agents import invoke_hosted_agent
 from app.services.llm_client import generate_agent_json
+from app.services.runtime import use_demo_mode, use_llm_mode
 from app.agents.demo_outputs import build_demo_coverage_result
 
 logger = logging.getLogger(__name__)
@@ -14,7 +15,10 @@ async def run_coverage_review(request_data: dict, clinical_findings: dict) -> di
     """Run Coverage Assessment Agent using local LLM, demo stub, or hosted agent."""
     template = build_demo_coverage_result(request_data, clinical_findings)
 
-    if settings.LOCAL_LLM_MODE:
+    if use_demo_mode():
+        return template
+
+    if use_llm_mode():
         try:
             return await generate_agent_json(
                 agent_name="Coverage Assessment Agent",
@@ -28,11 +32,10 @@ async def run_coverage_review(request_data: dict, clinical_findings: dict) -> di
                 template=template,
             )
         except Exception as exc:
-            logger.warning("Local LLM coverage agent failed; using demo output: %s", exc)
-            return template
-
-    if settings.DEMO_MODE:
-        return template
+            if settings.LLM_FALLBACK_TO_DEMO:
+                logger.warning("Local LLM coverage agent failed; using demo output: %s", exc)
+                return template
+            raise
 
     return await invoke_hosted_agent(
         "coverage-assessment-agent",
