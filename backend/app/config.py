@@ -15,18 +15,33 @@ def _env_float(name: str, default: str) -> float:
         return float(default)
 
 
+def _env_str(name: str, default: str = "") -> str:
+    value = os.getenv(name)
+    if value is not None and value.strip() != "":
+        return value.strip()
+    return default
+
+
 class Settings:
     FRONTEND_ORIGIN: str = os.getenv("FRONTEND_ORIGIN", "http://localhost:3000")
 
-    # Local research/demo mode: deterministic schema-shaped demo outputs.
-    DEMO_MODE: bool = _env_bool("DEMO_MODE", "false")
+    # Runtime selection:
+    # - demo: deterministic schema-shaped outputs, no AI key required.
+    # - llm: calls the configured chat-completions endpoint.
+    # - hosted: calls Azure/Foundry hosted agents.
+    # - auto: preserves legacy DEMO_MODE/LOCAL_LLM_MODE switching.
+    RUNTIME_MODE: str = _env_str("RUNTIME_MODE", "demo").lower()
 
-    # Local LLM mode: calls an OpenAI-compatible Chat Completions endpoint.
+    # Legacy flags retained for backwards compatibility when RUNTIME_MODE=auto.
+    DEMO_MODE: bool = _env_bool("DEMO_MODE", "false")
     LOCAL_LLM_MODE: bool = _env_bool("LOCAL_LLM_MODE", "false")
-    LLM_BASE_URL: str = os.getenv("LLM_BASE_URL", "")
-    LLM_API_KEY: str = os.getenv("LLM_API_KEY", "")
-    LLM_MODEL: str = os.getenv("LLM_MODEL", "")
+
+    # Local LLM / API mode. Configure these in backend/.env.
+    LLM_BASE_URL: str = _env_str("LLM_BASE_URL", "").rstrip("/")
+    LLM_API_KEY: str = _env_str("LLM_API_KEY", "")
+    LLM_MODEL: str = _env_str("LLM_MODEL", "gpt-4.1-mini")
     LLM_TEMPERATURE: float = _env_float("LLM_TEMPERATURE", "0.2")
+    LLM_FALLBACK_TO_DEMO: bool = _env_bool("LLM_FALLBACK_TO_DEMO", "false")
 
     HOSTED_AGENT_CLINICAL_URL: str = os.getenv("HOSTED_AGENT_CLINICAL_URL", "")
     HOSTED_AGENT_COMPLIANCE_URL: str = os.getenv("HOSTED_AGENT_COMPLIANCE_URL", "")
