@@ -1,11 +1,11 @@
-"""CPT/HCPCS code format validation and curated lookup table.
+"""MBS/procedure item format validation and curated lookup table.
 
 Pre-agent validation layer:
-  - Format validation: definitive (5-digit CPT, CPT Category III, or letter+4 HCPCS)
-  - Lookup table: informational (~30 common PA-trigger codes)
+  - Format validation: Australian MBS-style numeric items plus legacy CPT/HCPCS-compatible formats for demo compatibility
+  - Lookup table: informational examples for common private hospital funding scenarios
 
-This does NOT replace payer-specific code checks. It catches typos and
-provides descriptions for well-known codes before agents run.
+This does NOT replace payer-specific code checks. It catches obvious typos and
+provides descriptions for common items before agents run.
 """
 
 import re
@@ -13,45 +13,45 @@ import re
 
 # --- Format validation ---
 
-# CPT Category I: 5 digits, e.g. 27447.
-# CPT Category III: 4 digits + T, e.g. 0028T.
-# HCPCS Level II: 1 letter + 4 digits, e.g. J9271.
-_CPT_PATTERN = re.compile(r"^\d{5}$")
+# AU MBS item numbers are commonly numeric. Allow 4-6 digits to keep the demo
+# flexible for item numbers and hospital/procedure item variants.
+_MBS_ITEM_PATTERN = re.compile(r"^\d{4,6}$")
+# Keep CPT Category III and HCPCS-compatible patterns for backwards compatibility.
 _CPT_CATEGORY_III_PATTERN = re.compile(r"^\d{4}T$")
-_HCPCS_PATTERN = re.compile(r"^[A-V]\d{4}$")
+_HCPCS_PATTERN = re.compile(r"^[A-V]\d{4,6}$")
 
 
 def validate_code_format(code: str) -> dict:
-    """Validate CPT/HCPCS code format.
+    """Validate MBS/procedure item format.
 
     Returns dict with:
       code: the original code
-      valid_format: True if format matches CPT or HCPCS pattern
-      code_type: "CPT" | "CPT Category III" | "HCPCS" | "unknown"
+      valid_format: True if format matches an accepted pattern
+      code_type: "MBS item" | "CPT Category III" | "HCPCS-compatible" | "unknown"
       detail: human-readable message
     """
     code = code.strip().upper()
 
-    if _CPT_PATTERN.match(code):
+    if _MBS_ITEM_PATTERN.match(code):
         return {
             "code": code,
             "valid_format": True,
-            "code_type": "CPT",
-            "detail": f"{code} — valid CPT format (5-digit numeric)",
+            "code_type": "MBS item",
+            "detail": f"{code} — valid MBS-style numeric item format",
         }
     elif _CPT_CATEGORY_III_PATTERN.match(code):
         return {
             "code": code,
             "valid_format": True,
             "code_type": "CPT Category III",
-            "detail": f"{code} — valid CPT Category III format (4 digits + T)",
+            "detail": f"{code} — valid legacy CPT Category III-compatible format",
         }
     elif _HCPCS_PATTERN.match(code):
         return {
             "code": code,
             "valid_format": True,
-            "code_type": "HCPCS",
-            "detail": f"{code} — valid HCPCS Level II format (letter + 4 digits)",
+            "code_type": "HCPCS-compatible",
+            "detail": f"{code} — valid legacy HCPCS-compatible format",
         }
     else:
         return {
@@ -60,69 +60,33 @@ def validate_code_format(code: str) -> dict:
             "code_type": "unknown",
             "detail": (
                 f"{code} — invalid format. "
-                "Expected 5-digit CPT (e.g. 31628), CPT Category III "
-                "(e.g. 0028T), or letter+4 HCPCS (e.g. J9271)."
+                "Expected a 4-6 digit MBS-style item number, CPT Category III-compatible code, or letter+digits code."
             ),
         }
 
 
-# --- Curated lookup table (~30 common PA-trigger codes) ---
+# --- Curated lookup table for demo scenarios ---
 
 _KNOWN_CODES: dict[str, dict] = {
-    # Pulmonary / Bronchoscopy
-    "31628": {"description": "Bronchoscopy with transbronchial lung biopsy", "category": "Pulmonary"},
-    "31629": {"description": "Bronchoscopy with transbronchial needle aspiration", "category": "Pulmonary"},
-    "31652": {"description": "Bronchoscopy with endobronchial ultrasound (EBUS)", "category": "Pulmonary"},
-    # CPT Category III / Emerging technologies
-    "0028T": {"description": "CPT Category III temporary tracking code", "category": "Emerging Technology"},
-    # Imaging - Advanced
-    "71260": {"description": "CT chest with contrast", "category": "Imaging"},
-    "71250": {"description": "CT chest without contrast", "category": "Imaging"},
-    "77014": {"description": "CT guidance for biopsy/aspiration", "category": "Imaging"},
-    "70553": {"description": "MRI brain with and without contrast", "category": "Imaging"},
-    "74177": {"description": "CT abdomen and pelvis with contrast", "category": "Imaging"},
-    # Oncology - Infusion / Chemo
-    "96413": {"description": "Chemotherapy administration IV infusion, first hour", "category": "Oncology"},
-    "96415": {"description": "Chemotherapy administration IV infusion, each additional hour", "category": "Oncology"},
-    "96417": {"description": "Chemotherapy administration IV push, additional drug", "category": "Oncology"},
-    # Oncology - Specific Drugs (HCPCS)
-    "J9271": {"description": "Injection, pembrolizumab, 1 mg", "category": "Oncology - Drug"},
-    "J9299": {"description": "Injection, nivolumab, 1 mg", "category": "Oncology - Drug"},
-    "J9035": {"description": "Injection, bevacizumab, 10 mg", "category": "Oncology - Drug"},
-    "J9305": {"description": "Injection, pemetrexed, 10 mg", "category": "Oncology - Drug"},
-    "J9228": {"description": "Injection, ipilimumab, 1 mg", "category": "Oncology - Drug"},
-    # Orthopedic
-    "27447": {"description": "Total knee arthroplasty (replacement)", "category": "Orthopedic"},
-    "27130": {"description": "Total hip arthroplasty (replacement)", "category": "Orthopedic"},
-    "29881": {"description": "Arthroscopy knee, meniscectomy", "category": "Orthopedic"},
-    # Cardiology
-    "93458": {"description": "Left heart catheterization with angiography", "category": "Cardiology"},
-    "93306": {"description": "Transthoracic echocardiography, complete", "category": "Cardiology"},
-    "33361": {"description": "Transcatheter aortic valve replacement (TAVR)", "category": "Cardiology"},
-    # Neurology / Spine
-    "63030": {"description": "Lumbar laminotomy/discectomy, single level", "category": "Spine"},
-    "22551": {"description": "Anterior cervical discectomy and fusion (ACDF)", "category": "Spine"},
-    # GI
-    "43239": {"description": "Upper GI endoscopy with biopsy", "category": "GI"},
-    "45385": {"description": "Colonoscopy with polyp removal", "category": "GI"},
-    # DME (HCPCS)
-    "E0601": {"description": "CPAP device", "category": "DME"},
-    "L8614": {"description": "Cochlear implant device", "category": "DME"},
-    # Genetic Testing
-    "81479": {"description": "Unlisted molecular pathology procedure", "category": "Genetic Testing"},
-    "81455": {"description": "Targeted genomic sequence analysis panel, solid organ neoplasm", "category": "Genetic Testing"},
+    # Orthopaedic / private hospital examples
+    "49518": {"description": "Total knee replacement / arthroplasty item example", "category": "Orthopaedics"},
+    "48915": {"description": "Knee procedure associated item example", "category": "Orthopaedics"},
+    "49318": {"description": "Hip replacement / arthroplasty item example", "category": "Orthopaedics"},
+    "49118": {"description": "Arthroscopy / knee procedure item example", "category": "Orthopaedics"},
+    # Cardiac / procedural examples
+    "38200": {"description": "Coronary angiography item example", "category": "Cardiology"},
+    "38306": {"description": "Cardiac catheterisation item example", "category": "Cardiology"},
+    # Imaging / diagnostics
+    "63560": {"description": "MRI knee item example", "category": "Imaging"},
+    "56001": {"description": "CT imaging item example", "category": "Imaging"},
+    # Oncology / infusion compatibility examples
+    "96413": {"description": "Legacy infusion code retained for compatibility", "category": "Oncology"},
+    "J9271": {"description": "Legacy drug code retained for compatibility", "category": "Oncology - Drug"},
 }
 
 
 def lookup_code(code: str) -> dict:
-    """Look up a CPT/HCPCS code in the curated table.
-
-    Returns dict with:
-      code: the code
-      found: True if in the table
-      description: human-readable description (or "")
-      category: clinical category (or "")
-    """
+    """Look up a code in the curated demo table."""
     code = code.strip().upper()
     entry = _KNOWN_CODES.get(code)
     if entry:
@@ -141,13 +105,7 @@ def lookup_code(code: str) -> dict:
 
 
 def validate_procedure_codes(codes: list[str]) -> dict:
-    """Validate a list of procedure codes: format check + curated lookup.
-
-    Returns dict with:
-      valid: True if ALL codes have valid format
-      results: list of per-code results
-      summary: human-readable summary
-    """
+    """Validate a list of MBS/procedure item numbers: format check + curated lookup."""
     results = []
     all_valid = True
 
@@ -170,14 +128,13 @@ def validate_procedure_codes(codes: list[str]) -> dict:
 
         results.append(entry)
 
-    # Build summary
     total = len(results)
     valid_count = sum(1 for r in results if r["valid_format"])
     known_count = sum(1 for r in results if r["known"])
 
-    summary = f"{valid_count}/{total} codes valid format"
+    summary = f"{valid_count}/{total} MBS/procedure items valid format"
     if known_count:
-        summary += f", {known_count} recognized in lookup table"
+        summary += f", {known_count} recognized in demo lookup table"
     if not all_valid:
         invalid = [r["code"] for r in results if not r["valid_format"]]
         summary += f". INVALID: {', '.join(invalid)}"
