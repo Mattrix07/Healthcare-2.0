@@ -17,12 +17,12 @@ async def run_compliance_review(request_data: dict) -> dict:
     if settings.LOCAL_LLM_MODE:
         try:
             return await generate_agent_json(
-                agent_name="Compliance Agent",
+                agent_name="AU Private Health Compliance Agent",
                 system_prompt=(
-                    "You are a healthcare prior authorization compliance agent. "
-                    "Review whether the request has enough administrative and documentation detail for payer review. "
-                    "Focus on completeness, missing items, and next information requests. "
-                    "Do not make a final clinical or payment decision."
+                    "You are an Australian private health insurance compliance agent. "
+                    "Review whether the request has enough administrative and documentation detail for a pre-admission funding review. "
+                    "Focus on member eligibility inputs, provider identifier, MBS or procedure item numbers, planned hospital context, waiting-period flags, gap or excess context, and missing information requests. "
+                    "Do not make a final clinical or funding decision."
                 ),
                 payload=request_data,
                 template=template,
