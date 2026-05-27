@@ -26,8 +26,11 @@ async def run_synthesis_review(
     if settings.LOCAL_LLM_MODE:
         try:
             return await generate_agent_json(
-                agent_name="Synthesis Agent",
-                system_prompt="Combine the supplied review outputs into the same JSON shape as the template. Return JSON only.",
+                agent_name="AU Private Health Synthesis Agent",
+                system_prompt=(
+                    "Combine the supplied Australian private health review outputs into the same JSON shape as the template. "
+                    "Summarise the draft position for human review, including member eligibility, provider, item-number, hospital, gap, prosthesis and clinical-evidence considerations. Return JSON only."
+                ),
                 payload={
                     "request": request_data,
                     "compliance_result": compliance_result,
