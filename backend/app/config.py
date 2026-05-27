@@ -38,7 +38,7 @@ class Settings:
     LOCAL_LLM_MODE: bool = _env_bool("LOCAL_LLM_MODE", "false")
     LLM_BASE_URL: str = _env_first("LLM_BASE_URL", "OPENAI_BASE_URL")
     LLM_API_KEY: str = _env_first("LLM_API_KEY", "OPENAI_API_KEY")
-    LLM_MODEL: str = _env_first("LLM_MODEL", "OPENAI_MODEL", default="gpt-5.4-mini")
+    LLM_MODEL: str = _env_first("LLM_MODEL", "OPENAI_MODEL", default="gpt-4.1-mini")
     LLM_TEMPERATURE: float = _env_float("LLM_TEMPERATURE", "0.2")
 
     HOSTED_AGENT_CLINICAL_URL: str = os.getenv("HOSTED_AGENT_CLINICAL_URL", "")
