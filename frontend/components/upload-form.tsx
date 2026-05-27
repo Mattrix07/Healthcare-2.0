@@ -38,7 +38,7 @@ export function UploadForm({ onReviewComplete }: UploadFormProps) {
   const initialProgress: ReviewProgress = {
     currentPhase: "preflight",
     progressPct: 0,
-    message: "Starting review...",
+    message: "Starting AU private health funding review...",
     agents: {
       compliance: { status: "pending", detail: "Waiting" },
       clinical: { status: "pending", detail: "Waiting" },
@@ -118,14 +118,12 @@ export function UploadForm({ onReviewComplete }: UploadFormProps) {
         .filter((c) => c),
     };
 
-    // Pre-submit guards mirror backend Pydantic validators (issue #28)
-    // so an obviously invalid form never burns a backend round-trip.
     if (cleaned.diagnosis_codes.length === 0) {
-      setError("Add at least one diagnosis code (ICD-10).");
+      setError("Add at least one diagnosis code, usually ICD-10-AM or ICD-10 format.");
       return;
     }
     if (cleaned.procedure_codes.length === 0) {
-      setError("Add at least one procedure code (CPT/HCPCS).");
+      setError("Add at least one MBS item number or procedure code.");
       return;
     }
     if (cleaned.patient_dob && cleaned.patient_dob > new Date().toISOString().slice(0, 10)) {
@@ -145,10 +143,10 @@ export function UploadForm({ onReviewComplete }: UploadFormProps) {
         setLoading(false);
         setProgress(null);
         onReviewComplete(result);
-        toast.success("Review complete", {
+        toast.success("Funding review complete", {
           description: result.recommendation === "approve"
-            ? "Recommendation: Approve"
-            : "Recommendation: Pend for Review",
+            ? "Draft position: Eligible to fund"
+            : "Draft position: Pend for human review",
         });
       },
       (errMsg) => {
@@ -166,30 +164,29 @@ export function UploadForm({ onReviewComplete }: UploadFormProps) {
         <div>
           <CardTitle className="text-lg flex items-center gap-2">
             <FileText className="h-5 w-5 text-primary" />
-            New Authorization Request
+            New Pre-admission Funding Request
           </CardTitle>
           <p className="text-sm text-muted-foreground mt-1">
-            Enter patient and procedure details for AI-assisted clinical review
+            Enter member, provider, item and clinical details for an AI-assisted Australian private health insurance review
           </p>
         </div>
         <Button variant="secondary" size="sm" onClick={loadSample}>
           <FlaskConical className="mr-1 h-3.5 w-3.5" />
-          Load Sample Case
+          Load AU Sample Case
         </Button>
       </CardHeader>
 
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Row 1: Patient info */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="patient_name" className="flex items-center gap-1.5">
                 <User className="h-3.5 w-3.5 text-muted-foreground" />
-                Patient Name
+                Member Name
               </Label>
               <Input
                 id="patient_name"
-                placeholder="Jane Doe"
+                placeholder="Sarah Nguyen"
                 value={form.patient_name}
                 onChange={(e) => updateField("patient_name", e.target.value)}
                 required
@@ -211,16 +208,15 @@ export function UploadForm({ onReviewComplete }: UploadFormProps) {
             </div>
           </div>
 
-          {/* Row 2: Provider / Insurance */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="provider_npi" className="flex items-center gap-1.5">
                 <Hash className="h-3.5 w-3.5 text-muted-foreground" />
-                Provider NPI
+                Provider Identifier
               </Label>
               <Input
                 id="provider_npi"
-                placeholder="1234567890"
+                placeholder="AHPRA-MED0001234567 or provider number"
                 value={form.provider_npi}
                 onChange={(e) => updateField("provider_npi", e.target.value)}
                 required
@@ -229,38 +225,35 @@ export function UploadForm({ onReviewComplete }: UploadFormProps) {
             <div className="space-y-2">
               <Label htmlFor="insurance_id" className="flex items-center gap-1.5">
                 <CreditCard className="h-3.5 w-3.5 text-muted-foreground" />
-                Insurance ID (optional)
+                Member / Policy Number
               </Label>
               <Input
                 id="insurance_id"
-                placeholder="MCR-123456789A"
+                placeholder="BUPA-AU-7429135"
                 value={form.insurance_id ?? ""}
                 onChange={(e) => updateField("insurance_id", e.target.value)}
               />
             </div>
           </div>
 
-          {/* Section divider: Codes */}
           <div className="relative">
             <div className="absolute inset-0 flex items-center"><span className="w-full border-t" /></div>
-            <div className="relative flex justify-center text-xs uppercase"><span className="bg-card px-2 text-muted-foreground">Codes</span></div>
+            <div className="relative flex justify-center text-xs uppercase"><span className="bg-card px-2 text-muted-foreground">Codes and item numbers</span></div>
           </div>
 
-          {/* Dynamic code arrays */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {/* Diagnosis codes */}
             <div className="space-y-2">
               <Label className="flex items-center gap-1.5">
                 <Stethoscope className="h-3.5 w-3.5 text-muted-foreground" />
-                Diagnosis Codes (ICD-10)
+                Diagnosis Codes
               </Label>
               {form.diagnosis_codes.map((code, i) => (
                 <div key={i} className="flex gap-1">
                   <Input
-                    placeholder="e.g. R91.1"
+                    placeholder="e.g. M17.11"
                     value={code}
                     pattern="^[A-Ta-tV-Zv-z][0-9][A-Za-z0-9](?:\.[A-Za-z0-9]{1,4})?$"
-                    title="ICD-10 format, e.g. R91.1, M17.11, J18.9"
+                    title="ICD-10 / ICD-10-AM style format, e.g. M17.11, J18.9"
                     required={i === 0}
                     onChange={(e) =>
                       updateCode("diagnosis_codes", i, e.target.value)
@@ -289,19 +282,18 @@ export function UploadForm({ onReviewComplete }: UploadFormProps) {
               </Button>
             </div>
 
-            {/* Procedure codes */}
             <div className="space-y-2">
               <Label className="flex items-center gap-1.5">
                 <Hash className="h-3.5 w-3.5 text-muted-foreground" />
-                Procedure Codes (CPT)
+                MBS / Procedure Item Numbers
               </Label>
               {form.procedure_codes.map((code, i) => (
                 <div key={i} className="flex gap-1">
                   <Input
-                    placeholder="e.g. 31628"
+                    placeholder="e.g. 49518"
                     value={code}
-                    pattern="^([0-9]{4}[0-9A-Za-z]|[A-Za-z][0-9]{4})$"
-                    title="CPT/HCPCS format, e.g. 27447, 31628, J3490, 0028T"
+                    pattern="^([0-9]{4,6}[0-9A-Za-z]?|[A-Za-z][0-9]{4,6})$"
+                    title="MBS item or procedure code, e.g. 49518, 48915, 18213"
                     required={i === 0}
                     onChange={(e) =>
                       updateCode("procedure_codes", i, e.target.value)
@@ -326,53 +318,48 @@ export function UploadForm({ onReviewComplete }: UploadFormProps) {
                 onClick={() => addCode("procedure_codes")}
               >
                 <Plus className="mr-1 h-3.5 w-3.5" />
-                Add Code
+                Add Item
               </Button>
             </div>
           </div>
 
-          {/* Section divider: Clinical Information */}
           <div className="relative">
             <div className="absolute inset-0 flex items-center"><span className="w-full border-t" /></div>
-            <div className="relative flex justify-center text-xs uppercase"><span className="bg-card px-2 text-muted-foreground">Clinical Information</span></div>
+            <div className="relative flex justify-center text-xs uppercase"><span className="bg-card px-2 text-muted-foreground">Clinical and funding context</span></div>
           </div>
 
-          {/* Clinical notes */}
           <div className="space-y-2">
             <Label htmlFor="clinical_notes" className="flex items-center gap-1.5">
               <FileText className="h-3.5 w-3.5 text-muted-foreground" />
-              Clinical Notes
+              Clinical Notes and Admission Context
             </Label>
             <Textarea
               id="clinical_notes"
-              rows={5}
-              placeholder="Enter clinical notes, history of present illness, prior treatments..."
+              rows={6}
+              placeholder="Enter clinical notes, planned admission, hospital, prior conservative treatment, diagnostics, item numbers, prosthesis/device considerations and insurer policy context..."
               value={form.clinical_notes}
               onChange={(e) => updateField("clinical_notes", e.target.value)}
               required
             />
           </div>
 
-          {/* Progress tracker */}
           {progress && (
             <ProgressTracker progress={progress} />
           )}
 
-          {/* Error */}
           {error && (
             <Alert variant="destructive">
               <AlertDescription>{error}</AlertDescription>
             </Alert>
           )}
 
-          {/* Submit */}
           <Button type="submit" className="w-full bg-gradient-to-r from-brand to-brand-dark hover:from-brand-hover hover:to-brand-hover-dark text-white shadow-md" disabled={loading}>
             {loading ? (
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
             ) : (
               <Send className="mr-2 h-4 w-4" />
             )}
-            {loading ? "Submitting for Review..." : "Submit for Review"}
+            {loading ? "Submitting funding review..." : "Submit for Funding Review"}
           </Button>
         </form>
       </CardContent>
