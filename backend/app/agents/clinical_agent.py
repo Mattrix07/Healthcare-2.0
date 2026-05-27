@@ -15,21 +15,17 @@ async def run_clinical_review(request_data: dict) -> dict:
     template = build_demo_clinical_result(request_data)
 
     if settings.LOCAL_LLM_MODE:
-        try:
-            return await generate_agent_json(
-                agent_name="AU Clinical Reviewer Agent",
-                system_prompt=(
-                    "You are a clinical reviewer supporting an Australian private health insurance pre-admission workflow. "
-                    "Extract clinical facts from submitted notes, identify diagnosis and procedure item context, "
-                    "summarise prior conservative management, severity, functional impact, diagnostics, treating-specialist rationale, and missing evidence. "
-                    "Do not invent external records or claim live database access. Do not make a final benefit, claims, or clinical decision."
-                ),
-                payload=request_data,
-                template=template,
-            )
-        except Exception as exc:
-            logger.warning("Local LLM clinical agent failed; using demo output: %s", exc)
-            return template
+        return await generate_agent_json(
+            agent_name="AU Clinical Reviewer Agent",
+            system_prompt=(
+                "You are a clinical reviewer supporting an Australian private health insurance pre-admission workflow. "
+                "Extract clinical facts from submitted notes, identify diagnosis and procedure item context, "
+                "summarise prior conservative management, severity, functional impact, diagnostics, treating-specialist rationale, and missing evidence. "
+                "Do not invent external records or claim live database access. Do not make a final benefit, claims, or clinical decision."
+            ),
+            payload=request_data,
+            template=template,
+        )
 
     if settings.DEMO_MODE:
         return template
