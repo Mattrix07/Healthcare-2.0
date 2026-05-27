@@ -10,15 +10,18 @@ services:
       - "8000:8000"
     environment:
       # Modes:
-      # - DEMO_MODE=true: deterministic visual demo, no API keys.
-      # - LOCAL_LLM_MODE=true and DEMO_MODE=false: route agents to an OpenAI-compatible LLM.
-      # - DEMO_MODE=false and LOCAL_LLM_MODE=false: use Azure/hosted agent mode.
+      # - RUNTIME_MODE=demo: deterministic visual demo, no API keys.
+      # - RUNTIME_MODE=llm: route agents to an OpenAI-compatible LLM endpoint.
+      # - RUNTIME_MODE=hosted: use Azure/hosted agent mode.
+      # - RUNTIME_MODE=auto: preserve DEMO_MODE / LOCAL_LLM_MODE behaviour.
+      - RUNTIME_MODE=${RUNTIME_MODE:-auto}
       - DEMO_MODE=${DEMO_MODE:-true}
       - LOCAL_LLM_MODE=${LOCAL_LLM_MODE:-false}
       - LLM_BASE_URL=${LLM_BASE_URL:-}
       - LLM_API_KEY=${LLM_API_KEY:-}
-      - LLM_MODEL=${LLM_MODEL:-}
+      - LLM_MODEL=${LLM_MODEL:-gpt-4.1-mini}
       - LLM_TEMPERATURE=${LLM_TEMPERATURE:-0.2}
+      - LLM_FALLBACK_TO_DEMO=${LLM_FALLBACK_TO_DEMO:-false}
       # These URLs are used only when DEMO_MODE=false, LOCAL_LLM_MODE=false,
       # and the azure-agents profile is enabled.
       - HOSTED_AGENT_CLINICAL_URL=http://agent-clinical:8088

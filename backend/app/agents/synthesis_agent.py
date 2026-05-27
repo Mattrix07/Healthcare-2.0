@@ -3,6 +3,7 @@ import logging
 from app.config import settings
 from app.services.hosted_agents import invoke_hosted_agent
 from app.services.llm_client import generate_agent_json
+from app.services.runtime import use_demo_mode, use_llm_mode
 from app.agents.demo_outputs import build_demo_synthesis_result
 
 logger = logging.getLogger(__name__)
@@ -23,11 +24,18 @@ async def run_synthesis_review(
         cpt_validation=cpt_validation,
     )
 
-    if settings.LOCAL_LLM_MODE:
+    if use_demo_mode():
+        return template
+
+    if use_llm_mode():
         try:
             return await generate_agent_json(
                 agent_name="Synthesis Agent",
-                system_prompt="Combine the supplied review outputs into the same JSON shape as the template. Return JSON only.",
+                system_prompt=(
+                    "You are a prior authorization synthesis agent. Combine the supplied agent outputs into "
+                    "a final AI-assisted draft outcome using the same JSON shape as the template. "
+                    "Use only the supplied evidence and return JSON only."
+                ),
                 payload={
                     "request": request_data,
                     "compliance_result": compliance_result,
@@ -38,11 +46,10 @@ async def run_synthesis_review(
                 template=template,
             )
         except Exception as exc:
-            logger.warning("Local LLM synthesis failed; using fallback: %s", exc)
-            return template
-
-    if settings.DEMO_MODE:
-        return template
+            if settings.LLM_FALLBACK_TO_DEMO:
+                logger.warning("Local LLM synthesis failed; using fallback: %s", exc)
+                return template
+            raise
 
     return await invoke_hosted_agent(
         "synthesis-decision-agent",

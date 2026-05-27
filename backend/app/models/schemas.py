@@ -26,6 +26,7 @@ from pydantic import BaseModel, Field, field_validator
 _DOB_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 _ICD10_RE = re.compile(r"^[A-TV-Z][0-9][A-Z0-9](?:\.[A-Z0-9]{1,4})?$")
 _CPT_HCPCS_RE = re.compile(r"^([0-9]{4}[0-9A-Z]|[A-Z][0-9]{4})$")
+_RUNTIME_MODES = {"demo", "llm", "hosted", "auto"}
 
 
 class PriorAuthRequest(BaseModel):
@@ -36,6 +37,7 @@ class PriorAuthRequest(BaseModel):
     procedure_codes: list[str] = Field(min_length=1)  # CPT/HCPCS codes
     clinical_notes: str
     insurance_id: str | None = None
+    runtime_mode: str | None = None  # Optional per-run override: demo, llm, hosted, auto
 
     @field_validator("patient_dob", mode="after")
     @classmethod
@@ -54,6 +56,16 @@ class PriorAuthRequest(BaseModel):
         if parsed > date.today():
             raise ValueError("patient_dob must not be in the future")
         return v
+
+    @field_validator("runtime_mode", mode="after")
+    @classmethod
+    def _validate_runtime_mode(cls, v: str | None) -> str | None:
+        if v is None or v == "":
+            return None
+        cleaned = v.strip().lower()
+        if cleaned not in _RUNTIME_MODES:
+            raise ValueError("runtime_mode must be one of: demo, llm, hosted, auto")
+        return cleaned
 
     @field_validator("diagnosis_codes", mode="after")
     @classmethod
@@ -272,6 +284,7 @@ class ReviewResponse(BaseModel):
     criteria_summary: str = ""  # e.g. "8 of 8 criteria MET"
     synthesis_audit_trail: dict = {}  # gate_results + confidence_components from synthesis agent
     disclaimer: str = "AI-assisted draft. Medicare LCDs/NCDs applied. Human review required."
+    runtime_mode: str | None = None
     agent_results: AgentResults | None = None
     audit_trail: AuditTrail | None = None
     audit_justification: str | None = None

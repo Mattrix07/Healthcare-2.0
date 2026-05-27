@@ -64,6 +64,40 @@ def _extract_json_object(text: str) -> dict:
     raise ValueError(f"Could not parse JSON object from LLM output: {text[:300]}")
 
 
+def _blank_schema_shape(value: Any) -> Any:
+    """Return a type-preserving blank schema shape without demo content.
+
+    Agent templates are built from deterministic demo outputs, so sending the
+    raw template to the model encourages it to copy demo strings such as
+    `*_demo`, `DEMO-LCD`, and `Local demo output only`. This helper keeps only
+    the JSON structure and value types.
+    """
+    if isinstance(value, dict):
+        return {k: _blank_schema_shape(v) for k, v in value.items()}
+    if isinstance(value, list):
+        if not value:
+            return []
+        return [_blank_schema_shape(value[0])]
+    if isinstance(value, bool):
+        return False
+    if isinstance(value, int):
+        return 0
+    if isinstance(value, float):
+        return 0.0
+    if value is None:
+        return None
+    return ""
+
+
+def _merge_missing_keys(result: dict, template: dict) -> dict:
+    """Fill missing top-level keys from a blank template for API stability."""
+    merged = dict(result)
+    blanks = _blank_schema_shape(template)
+    for key, value in blanks.items():
+        merged.setdefault(key, value)
+    return merged
+
+
 async def generate_agent_json(
     *,
     agent_name: str,
@@ -77,24 +111,26 @@ async def generate_agent_json(
         agent_name: Human-readable agent name for logging.
         system_prompt: Agent instructions.
         payload: Request/context payload to analyse.
-        template: Schema-shaped example object. The model is instructed to keep
-            this shape so the existing frontend/Pydantic models can consume it.
+        template: Schema-shaped object used only to derive a blank JSON shape.
     """
     if not settings.LLM_MODEL:
-        raise RuntimeError("LOCAL_LLM_MODE is enabled but LLM_MODEL is not set")
+        raise RuntimeError("LLM mode is enabled but LLM_MODEL is not set")
 
     client = _get_client()
+    blank_shape = _blank_schema_shape(template)
 
     user_prompt = {
         "task": f"Return the {agent_name} result as a single JSON object only.",
         "strict_requirements": [
             "Return valid JSON only. No markdown. No commentary.",
-            "Keep the same top-level keys and compatible value types as the template.",
-            "Do not include PHI beyond what the user supplied.",
-            "This is a research prototype. Do not present the output as a final clinical or payer determination.",
+            "Use the supplied case data. Do not copy placeholder wording.",
+            "Keep the same top-level keys and compatible value types as the blank JSON shape.",
+            "Do not output demo labels such as *_demo, DEMO-LCD, Demo synthesis, or Local demo output only.",
+            "Do not include patient information beyond what the user supplied.",
+            "This is a research prototype. Human review is required before operational use.",
         ],
         "input_payload": payload,
-        "json_template_shape": template,
+        "blank_json_shape": blank_shape,
     }
 
     messages = [
@@ -125,5 +161,6 @@ async def generate_agent_json(
 
     content = response.choices[0].message.content or ""
     result = _extract_json_object(content)
+    result = _merge_missing_keys(result, template)
     logger.info("%s produced local LLM JSON output", agent_name)
     return result
