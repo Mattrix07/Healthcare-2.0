@@ -19,7 +19,7 @@ services:
       # OpenAI-first local LLM settings. Set these in your root .env file.
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
       - OPENAI_MODEL=${OPENAI_MODEL:-gpt-4.1-mini}
-      - OPENAI_BASE_URL=${OPENAI_BASE_URL:-}
+      - OPENAI_BASE_URL=${OPENAI_BASE_URL:-https://api.openai.com/v1}
       # Generic OpenAI-compatible provider settings still work too.
       - LLM_BASE_URL=${LLM_BASE_URL:-}
       - LLM_API_KEY=${LLM_API_KEY:-}
