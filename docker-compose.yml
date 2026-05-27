@@ -7,7 +7,8 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     ports:
-      - "8000:8000"
+      # Expose backend on localhost:8010 so it does not clash with other local apps.
+      - "8010:8000"
     environment:
       # Modes:
       # - DEMO_MODE=true: deterministic visual demo, no API keys.
@@ -15,6 +16,11 @@ services:
       # - DEMO_MODE=false and LOCAL_LLM_MODE=false: use Azure/hosted agent mode.
       - DEMO_MODE=${DEMO_MODE:-true}
       - LOCAL_LLM_MODE=${LOCAL_LLM_MODE:-false}
+      # OpenAI-first local LLM settings. Set these in your root .env file.
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - OPENAI_MODEL=${OPENAI_MODEL:-gpt-4.1-mini}
+      - OPENAI_BASE_URL=${OPENAI_BASE_URL:-https://api.openai.com/v1}
+      # Generic OpenAI-compatible provider settings still work too.
       - LLM_BASE_URL=${LLM_BASE_URL:-}
       - LLM_API_KEY=${LLM_API_KEY:-}
       - LLM_MODEL=${LLM_MODEL:-}
@@ -26,12 +32,10 @@ services:
       - HOSTED_AGENT_COMPLIANCE_URL=http://agent-compliance:8088
       - HOSTED_AGENT_SYNTHESIS_URL=http://agent-synthesis:8088
       # App settings
-      - FRONTEND_ORIGIN=http://localhost:3000
+      - FRONTEND_ORIGIN=http://localhost:3010
       # OTel sensitive-data capture (PHI risk — local dev only).
-      # Uncomment in your shell or backend/.env, never commit as `true`.
+      # Uncomment in your shell, never commit as `true`.
       # - ENABLE_OTEL_SENSITIVE_DATA=${ENABLE_OTEL_SENSITIVE_DATA:-false}
-    env_file:
-      - ./backend/.env
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s
@@ -144,7 +148,8 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
     ports:
-      - "3000:80"
+      # Expose frontend on localhost:3010 so it does not clash with other local apps.
+      - "3010:80"
     depends_on:
       backend:
         condition: service_healthy

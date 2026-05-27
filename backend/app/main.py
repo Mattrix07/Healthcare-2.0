@@ -18,8 +18,8 @@ logging.getLogger("app").setLevel(getattr(logging, _log_level, logging.INFO))
 setup_observability()
 
 app = FastAPI(
-    title="Prior Authorization Review API",
-    description="Prior auth review powered by Azure OpenAI gpt-5.4 via Microsoft Agent Framework",
+    title="Australian Private Health Review API",
+    description="AI-assisted pre-admission funding review for Australian private health insurance workflows",
     version="0.1.0",
 )
 

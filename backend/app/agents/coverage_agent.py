@@ -17,11 +17,10 @@ async def run_coverage_review(request_data: dict, clinical_findings: dict) -> di
     if settings.LOCAL_LLM_MODE:
         try:
             return await generate_agent_json(
-                agent_name="Coverage Assessment Agent",
+                agent_name="AU Private Health Coverage Agent",
                 system_prompt=(
-                    "You are a prior authorization coverage assessment agent. "
-                    "Review the request and clinical findings for provider details, representative criteria, "
-                    "documentation gaps, and items that need human review. "
+                    "You are an Australian private health insurance coverage assessment agent. "
+                    "Review the request and clinical findings for member eligibility inputs, hospital cover, waiting-period flags, pre-existing condition review, MBS item alignment, contracted hospital context, gap or excess context, prosthesis or device considerations, documentation gaps, and items that need human review. "
                     "Use only the payload provided. Return structured JSON only."
                 ),
                 payload={"request": request_data, "clinical_findings": clinical_findings},

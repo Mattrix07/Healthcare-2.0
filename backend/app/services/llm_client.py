@@ -41,7 +41,6 @@ def _extract_json_object(text: str) -> dict:
     if not text:
         raise ValueError("LLM returned empty content")
 
-    # Remove common fenced code-block wrappers.
     fenced = re.search(r"```(?:json)?\s*(.*?)\s*```", text, flags=re.DOTALL | re.IGNORECASE)
     if fenced:
         text = fenced.group(1).strip()
@@ -53,7 +52,6 @@ def _extract_json_object(text: str) -> dict:
     except json.JSONDecodeError:
         pass
 
-    # Fallback: locate the first object-shaped region.
     start = text.find("{")
     end = text.rfind("}")
     if start != -1 and end != -1 and end > start:
@@ -64,6 +62,48 @@ def _extract_json_object(text: str) -> dict:
     raise ValueError(f"Could not parse JSON object from LLM output: {text[:300]}")
 
 
+def _error_result(agent_name: str, template: dict, exc: Exception) -> dict:
+    """Return a schema-compatible object that makes local LLM failures obvious.
+
+    Agent files may still contain legacy try/except fallback code. Returning an
+    explicit object instead of raising prevents those wrappers from replacing the
+    failure with normal-looking deterministic demo output.
+    """
+    message = f"{type(exc).__name__}: {exc}"
+    result = dict(template)
+    result["error"] = f"{agent_name} local LLM call failed: {message}"
+    result["agent_name"] = agent_name
+    result["tool_results"] = [
+        {
+            "tool_name": "local_llm_call",
+            "status": "fail",
+            "detail": result["error"],
+        }
+    ]
+    result["checks_performed"] = [
+        {
+            "rule": "Local LLM invocation",
+            "result": "fail",
+            "detail": result["error"],
+        }
+    ]
+    if "summary" in result:
+        result["summary"] = result["error"]
+    if "clinical_summary" in result:
+        result["clinical_summary"] = result["error"]
+    if "clinical_rationale" in result:
+        result["clinical_rationale"] = result["error"]
+    if "recommendation" in result:
+        result["recommendation"] = "pend_for_review"
+    if "confidence" in result:
+        result["confidence"] = 0.0
+    if "confidence_level" in result:
+        result["confidence_level"] = "LOW"
+    if "disclaimer" in result:
+        result["disclaimer"] = "Local LLM call failed. Check backend logs, OPENAI_API_KEY, OPENAI_MODEL, quota and base URL configuration."
+    return result
+
+
 async def generate_agent_json(
     *,
     agent_name: str,
@@ -71,17 +111,9 @@ async def generate_agent_json(
     payload: dict,
     template: dict,
 ) -> dict:
-    """Call the configured LLM and return a JSON object.
-
-    Args:
-        agent_name: Human-readable agent name for logging.
-        system_prompt: Agent instructions.
-        payload: Request/context payload to analyse.
-        template: Schema-shaped example object. The model is instructed to keep
-            this shape so the existing frontend/Pydantic models can consume it.
-    """
+    """Call the configured LLM and return a JSON object."""
     if not settings.LLM_MODEL:
-        raise RuntimeError("LOCAL_LLM_MODE is enabled but LLM_MODEL is not set")
+        return _error_result(agent_name, template, RuntimeError("LOCAL_LLM_MODE is enabled but LLM_MODEL/OPENAI_MODEL is not set"))
 
     client = _get_client()
 
@@ -108,22 +140,24 @@ async def generate_agent_json(
         "temperature": settings.LLM_TEMPERATURE,
     }
 
-    # Prefer JSON mode where supported, but retry without it for providers that
-    # implement only a subset of the OpenAI API.
     try:
-        response = await client.chat.completions.create(
-            **request_kwargs,
-            response_format={"type": "json_object"},
-        )
-    except Exception as first_exc:
-        logger.info(
-            "%s JSON-mode call failed; retrying without response_format: %s",
-            agent_name,
-            first_exc,
-        )
-        response = await client.chat.completions.create(**request_kwargs)
+        try:
+            response = await client.chat.completions.create(
+                **request_kwargs,
+                response_format={"type": "json_object"},
+            )
+        except Exception as first_exc:
+            logger.info(
+                "%s JSON-mode call failed; retrying without response_format: %s",
+                agent_name,
+                first_exc,
+            )
+            response = await client.chat.completions.create(**request_kwargs)
 
-    content = response.choices[0].message.content or ""
-    result = _extract_json_object(content)
-    logger.info("%s produced local LLM JSON output", agent_name)
-    return result
+        content = response.choices[0].message.content or ""
+        result = _extract_json_object(content)
+        logger.info("%s produced local LLM JSON output", agent_name)
+        return result
+    except Exception as exc:
+        logger.exception("%s local LLM call failed", agent_name)
+        return _error_result(agent_name, template, exc)
